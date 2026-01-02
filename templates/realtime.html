@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MediMind AI – Real-Time Skin Detection</title>
+    <style>
+        body {font-family: Arial; text-align:center; background:#1a1a2e; color:white; padding:20px; margin:0;}
+        video {border:5px solid #00d4aa; border-radius:15px; margin:20px auto; display:block; width:640px; height:480px;}
+        #result {font-size:32px; margin:20px; padding:20px; background:rgba(0,212,170,0.2); border-radius:15px; max-width:700px; margin:20px auto;}
+        button {padding:15px 30px; margin:10px; font-size:18px; border:none; border-radius:50px; cursor:pointer; transition:0.3s;}
+        .start {background:#00d4aa; color:white;}
+        .stop {background:#ff6b6b; color:white;}
+        .back-btn {
+            position: fixed; top: 20px; left: 20px; z-index: 9999;
+            background: #ff6b6b; color:white; padding:12px 25px; font-size:16px;
+            border-radius:50px; text-decoration:none; box-shadow:0 5px 15px rgba(255,107,107,0.5);
+        }
+        .back-btn:hover {background:#ee5a52; transform:scale(1.05);}
+    </style>
+</head>
+<body>
+    
+    <a href="/" class="back-btn">
+        Back to Chat
+    </a>
+
+    <h1>MediMind AI – Real-Time Skin Check</h1>
+    <p>Point your camera at the skin area</p>
+
+    <video id="video" autoplay></video><br>
+    
+    <button class="start" onclick="startDetection()">Start Detection</button>
+    <button class="stop" onclick="stopDetection()">Stop Detection</button>
+
+    <div id="result">Point camera at skin...</div>
+
+    <script>
+        const video = document.getElementById("video");
+        navigator.mediaDevices.getUserMedia({video: true})
+            .then(stream => video.srcObject = stream)
+            .catch(err => alert("Camera access denied or not available"));
+
+        let interval;
+        function startDetection() {
+            if (interval) clearInterval(interval);
+            document.getElementById("result").innerHTML = "Analyzing...";
+            
+            interval = setInterval(() => {
+                const canvas = document.createElement("canvas");
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext("2d").drawImage(video, 0, 0);
+                const dataUrl = canvas.toDataURL("image/jpeg");
+
+                fetch("/realtime_detect", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({image: dataUrl})
+                })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById("result").innerHTML = 
+                        `<strong>Disease: ${data.disease}</strong><br>Confidence: ${data.confidence}%`;
+                })
+                .catch(err => {
+                    document.getElementById("result").innerHTML = "Error in detection";
+                });
+            }, 1000);
+        }
+
+        function stopDetection() {
+            clearInterval(interval);
+            document.getElementById("result").innerHTML = "Detection stopped";
+        }
+
+        
+        window.onload = () => startDetection();
+    </script>
+</body>
+</html>

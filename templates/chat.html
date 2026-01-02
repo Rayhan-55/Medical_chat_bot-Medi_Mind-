@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediMind AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root { --primary: #00d4aa; --primary-dark: #00b894; --bg: #f5f7fa; --card: #ffffff; --text: #2d3748; --border: #e2e8f0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Poppins', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 100vh; display: flex; justify-content: center; align-items: center; padding: 10px; }
+        .chat-container { width: 480px; max-width: 95%; height: 85vh; background: var(--card); border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); overflow: hidden; display: flex; flex-direction: column; }
+        .header { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; padding: 20px; text-align: center; }
+        .header h1 { font-size: 24px; font-weight: 600; }
+        .header p { font-size: 14px; opacity: 0.9; margin-top: 5px; }
+        .messages { flex: 1; padding: 20px; overflow-y: auto; background: var(--bg); display: flex; flex-direction: column; gap: 15px; }
+        .message { max-width: 80%; padding: 12px 18px; border-radius: 18px; line-height: 1.5; word-wrap: break-word; }
+        .user { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 4px; }
+        .bot { align-self: flex-start; background: white; color: var(--text); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+        .input-area { padding: 15px 20px 20px; background: white; border-top: 1px solid var(--border); }
+        .input-group { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
+        #userInput { flex: 1; padding: 14px 20px; border: 2px solid #e2e8f0; border-radius: 50px; font-size: 16px; outline: none; }
+        #userInput:focus { border-color: var(--primary); }
+        .send-btn { width: 50px; height: 50px; background: var(--primary); color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 20px; }
+        .action-btns { display: flex; gap: 12px; }
+        .btn { flex: 1; padding: 16px; border: none; border-radius: 50px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .realtime-btn { background: linear-gradient(135deg, #ff6b6b, #ee5a52); color: white; }
+        .upload-btn { background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; }
+        .skin-result { background: white; padding: 15px; border-radius: 15px; margin-top: 10px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        #preview { max-width: 100%; border-radius: 12px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">
+            <h1>MediMind AI</h1>
+            <p>Your Personal Skin & Health Assistant</p>
+        </div>
+
+        <div class="messages" id="messages">
+            <div class="message bot">
+                Hello! I'm MediMind AI.<br>
+                Ask me anything about health or use the buttons below for skin check!
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-group">
+                <input type="text" id="userInput" placeholder="Type your question..." autocomplete="off">
+                <button class="send-btn" onclick="sendMessage()">Send</button>
+            </div>
+
+            <div class="action-btns">
+                <button class="btn realtime-btn" onclick="openRealtime()">Live Camera Check</button>
+                <button class="btn upload-btn" onclick="document.getElementById('fileInput').click()">Upload Image & Check</button>
+            </div>
+
+            <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="uploadImage(this.files[0])">
+        </div>
+    </div>
+
+    <script>
+        const messagesDiv = document.getElementById('messages');
+        const input = document.getElementById('userInput');
+
+        function addMessage(text, sender) {
+            const div = document.createElement('div');
+            div.className = `message ${sender}`;
+            div.innerHTML = text;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const msg = input.value.trim();
+            if (!msg) return;
+            addMessage(msg, 'user');
+            input.value = '';
+            addMessage("Thinking...", 'bot');
+
+            const res = await fetch("/get", { method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body: "msg=" + encodeURIComponent(msg) });
+            const answer = await res.text();
+            messagesDiv.lastChild.remove();
+            addMessage(answer, 'bot');
+        }
+
+        function openRealtime() {
+            window.open("/realtime", "_blank");
+        }
+
+        async function uploadImage(file) {
+            if (!file) return;
+
+            const previewUrl = URL.createObjectURL(file);
+
+            addMessage(`
+                <strong>You uploaded an image:</strong><br>
+                <img src="${previewUrl}" style="max-width:100%; border-radius:12px; margin:10px 0;">
+                <div style="background:#e0f7fa; padding:10px; border-radius:10px;">
+                    <em>Analyzing your skin...</em>
+                </div>
+            `, 'user');
+
+            const formData = new FormData();
+            formData.append("image", file);
+
+            try {
+                const res = await fetch("/upload_detect", { method: "POST", body: formData });
+                const data = await res.json();
+
+                addMessage(`
+                    <strong>Skin Analysis Result</strong><br>
+                    <img src="${previewUrl}" style="max-width:100%; border-radius:12px; margin:10px 0;">
+                    <div style="background:#fff3cd; padding:15px; border-radius:12px; border-left:5px solid #ffc107;">
+                        <strong>Disease:</strong> ${data.disease}<br>
+                        <strong>Confidence:</strong> ${data.confidence}
+                    </div>
+                `, 'bot');
+
+            } catch (err) {
+                addMessage("Error analyzing image. Please try again.", 'bot');
+            }
+
+            input.focus();
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        input.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+    </script>
+</body>
+</html>
